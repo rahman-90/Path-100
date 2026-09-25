@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Sensual Path - 100 Tiles Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;1,600&family=Poppins:wght@300;400;600;700&display=swap');
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #0f172a;
+            background-image: radial-gradient(circle at 50% 0%, #701a75 0%, #0f172a 60%), radial-gradient(circle at 50% 100%, #be123c 0%, #0f172a 80%);
+            color: #f8fafc;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        .title-font {
+            font-family: 'Playfair Display', serif;
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(244, 63, 94, 0.3);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 40px rgba(225, 29, 72, 0.2);
+        }
+
+        .board-cell {
+            position: relative;
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.3);
+            transition: all 0.3s;
+            overflow: hidden;
+        }
+
+        @media (min-width: 768px) {
+            .board-cell { font-size: 0.8rem; border-radius: 6px; }
+        }
+
+        .board-cell.ladder {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: rgba(16, 185, 129, 0.5);
+            color: #34d399;
+            box-shadow: inset 0 0 8px rgba(16, 185, 129, 0.2);
+        }
+        
+        .board-cell.snake {
+            background: rgba(225, 29, 72, 0.2);
+            border-color: rgba(225, 29, 72, 0.5);
+            color: #fb7185;
+            box-shadow: inset 0 0 8px rgba(225, 29, 72, 0.2);
+        }
+
+        .board-cell.special {
+            background: rgba(217, 70, 239, 0.25);
+            border-color: rgba(217, 70, 239, 0.6);
+            color: #f0abfc;
+            box-shadow: 0 0 10px rgba(217, 70, 239, 0.5) inset;
+        }
+
+        .board-cell.finish {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.4), rgba(225, 29, 72, 0.4));
+            border-color: #f59e0b;
+            color: #fcd34d;
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.5) inset;
+        }
+
+        .token {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            z-index: 10;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        .token-1 {
+            background-color: #3b82f6; 
+            color: #3b82f6;
+            border: 1px solid #fff;
+        }
+
+        .token-2 {
+            background-color: #ec4899; 
+            color: #ec4899;
+            border: 1px solid #fff;
+        }
+
+        @keyframes rollEffect {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(180deg) scale(1.2) translateY(-10px); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+        .rolling {
+            animation: rollEffect 0.5s ease-in-out;
+        }
+
+        /* Modal Animation & Pulse */
+        .modal-enter {
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.9) translateY(20px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .pulse-danger {
+            box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.7);
+            animation: pulse-red 2s infinite;
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(225, 29, 72, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
+        }
+
+        /* Typewriter Cursor */
+        .cursor-blink::after {
+            content: ' |';
+            animation: blink 1s step-end infinite;
+            color: #ec4899;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        .sensor-blur {
+            filter: blur(25px);
+            transform: scale(1.1);
+        }
+
+        /* Custom Scrollbar untuk tampilan HP ukuran kecil */
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e11d48; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div id="particles" class="absolute inset-0 pointer-events-none z-0"></div>
+
+    <main class="glass-panel relative z-10 w-[98%] max-w-[600px] rounded-3xl p-3 md:p-5 flex flex-col items-center">
+        
+        <!-- Header & Upload -->
+        <div class="w-full flex justify-between items-center mb-3">
+            <div class="text-left">
+                <h1 class="title-font text-2xl md:text-3xl text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-fuchsia-500 font-bold drop-shadow-md">
+                    Sensual Path 100
+                </h1>
+                <p class="text-[10px] md:text-xs text-rose-300 font-light tracking-wider uppercase">LDR Board Game 18+ (Explicit)</p>
+            </div>
+            
+            <label title="Upload Foto Kejutan" class="cursor-pointer bg-slate-900/80 border border-rose-500/50 p-2.5 rounded-full hover:bg-rose-900 transition-all z-20 shadow-[0_0_15px_rgba(225,29,72,0.3)] flex-shrink-0 relative overflow-hidden group">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-rose-400 group-hover:scale-110 transition-transform"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <span id="photo-count" class="absolute -top-1 -right-1 bg-fuchsia-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full hidden">0</span>
+                <input type="file" accept="image/*" multiple class="hidden" onchange="handlePhotoUpload(event)">
+            </label>
+        </div>
+
+        <div class="w-full flex justify-between items-center bg-slate-950/60 rounded-xl p-2 mb-3 border border-slate-700/50">
+            <div id="p1-status" class="flex flex-col items-center p-2 rounded-lg transition-all duration-300 w-1/3">
+                <div class="w-4 h-4 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6] mb-1"></div>
+                <span class="text-[10px] md:text-xs font-bold text-blue-200">SUAMI</span>
+            </div>
+            <div class="text-[10px] font-bold text-slate-400 bg-slate-900 px-3 py-1 rounded-full border border-slate-700">
+                VS
+            </div>
+            <div id="p2-status" class="flex flex-col items-center p-2 rounded-lg transition-all duration-300 w-1/3 opacity-50">
+                <div class="w-4 h-4 rounded-full bg-pink-500 shadow-[0_0_8px_#ec4899] mb-1"></div>
+                <span class="text-[10px] md:text-xs font-bold text-pink-200">ISTRI</span>
+            </div>
+        </div>
+
+        <!-- Board 10x10 Grid -->
+        <div id="board" class="w-full aspect-square grid grid-cols-10 grid-rows-10 gap-0.5 md:gap-1 mb-4 relative p-1 bg-slate-900/50 rounded-xl border border-slate-700/50 shadow-inner">
+            <div id="token-p1" class="token token-1"></div>
+            <div id="token-p2" class="token token-2"></div>
+        </div>
+
+        <!-- Controls -->
+        <div class="w-full flex items-center gap-3">
+            <div id="dice-display" class="w-14 h-14 bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl border border-slate-600 flex items-center justify-center text-2xl font-bold text-white shadow-[0_0_10px_rgba(255,255,255,0.1)] flex-shrink-0">
+                🎲
+            </div>
+            <button id="btn-roll" onclick="rollDice()" class="flex-1 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-bold py-3 md:py-4 px-4 rounded-xl shadow-[0_0_20px_rgba(225,29,72,0.5)] transition-all active:scale-95 flex justify-center items-center gap-2 text-sm md:text-base border border-rose-400/50 pulse-danger">
+                LEMPAR DADU
+            </button>
+        </div>
+
+    </main>
+
+    <div id="action-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 hidden flex-col items-center justify-center p-4">
+        <div id="modal-content" class="bg-slate-900/90 border-2 border-rose-600 rounded-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto p-6 flex flex-col items-center text-center shadow-[0_0_50px_rgba(225,29,72,0.4)] modal-enter relative overflow-x-hidden custom-scrollbar">
+            
+            <div class="absolute -top-20 -right-20 w-40 h-40 bg-rose-600/30 rounded-full blur-3xl"></div>
+            <div class="absolute -bottom-20 -left-20 w-40 h-40 bg-purple-600/30 rounded-full blur-3xl"></div>
+            
+            <div id="modal-header" class="text-white text-[10px] md:text-xs px-5 py-1.5 rounded-full font-bold tracking-widest shadow-lg mb-5 z-10 border border-white/20">
+                HEADER
+            </div>
+            
+            <div class="z-10 w-full mb-6 font-medium title-font text-slate-200 text-left min-h-[100px] flex flex-col justify-center">
+                <span id="prompt-text" class="text-lg md:text-xl text-white font-medium cursor-blink"></span>
+                <div id="prompt-subtext" class="text-xs text-rose-300 mt-4 opacity-0 transition-opacity duration-500 italic"></div>
+            </div>
+            
+            <div id="modal-custom-html" class="w-full z-10 mb-6 hidden"></div>
+
+            <button id="btn-close-modal" class="z-10 w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold py-3 rounded-xl transition-all shadow-md opacity-0 pointer-events-none translate-y-4 duration-500">
+                LAKUKAN & LANJUT 🥵
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 10x10 Board Generation Logic (1 to 100 Serpentine)
+        const pathVisualMap = [];
+        for (let row = 9; row >= 0; row--) {
+            let rowStart = row * 10 + 1;
+            let rowTiles = [];
+            for(let i=0; i<10; i++) {
+                rowTiles.push(rowStart + i);
+            }
+            if (row % 2 !== 0) rowTiles.reverse(); // Bends the snake
+            pathVisualMap.push(...rowTiles);
+        }
+
+        // Steamy Mechanics Setup
+        const ladders = { 4:14, 12:31, 20:38, 28:84, 40:59, 51:67, 63:81, 71:91 };
+        const snakes = { 17:7, 34:1, 54:34, 62:19, 64:60, 87:24, 93:73, 95:75, 99:78 };
+        const specialTiles = [15, 33, 69, 88]; // 69 is mandatory 😏
+        const finishTile = 100;
+
+        let gameState = {
+            turn: 1, 
+            p1: { pos: 1, color: '#3b82f6', name: 'Suami' },
+            p2: { pos: 1, color: '#ec4899', name: 'Istri' },
+            isMoving: false,
+            uploadedPhotos: []
+        };
+
+        const prompts = {
+            truth: [
+                "Bagian tubuh mana dariku yang paling bikin kamu basah/keras saat ini juga?",
+                "Ceritakan secara detail bagaimana caramu menyentuh dirimu sendiri semalam sambil memikirkan aku.",
+                "Jika aku ada di sebelahmu sekarang, apa hal pertama yang akan kamu lakukan padaku di ranjang?",
+                "Posisi seks apa yang selalu ada di fantasimu yang paling liar tapi belum sempat kita coba?",
+                "Kapan terakhir kali kamu diam-diam masturbasi saat sedang chatting atau video call denganku?",
+                "Deskripsikan pakaian/lingerie paling menggoda yang akan kamu pakai khusus malam pertama kita bertemu lagi.",
+                "Sebutkan fantasi paling 'kotor' yang kamu ingin aku lakukan secara paksa padamu.",
+                "Pernahkah kamu membayangkan kita bercinta di tempat umum? Di mana itu?",
+                "Apa kalimat kotor (dirty talk) dariku yang paling bikin kamu cepat klimaks?",
+                "Gaya sentuhan seperti apa yang langsung membuatmu merinding kegirangan?"
+            ],
+            dare: [
+                "Posisikan kamera dengan baik, lalu sentuh dan elus bagian paling sensitifmu perlahan selama 30 detik tanpa putus kontak mata.",
+                "Lepas pakaian dalammu (panty/celana dalam) di depan kamera sekarang, dan biarkan kamu tidak memakainya sampai game ini selesai.",
+                "Desahkan namaku dengan suara paling liar yang kamu punya, bayangkan tanganku sedang bermain di bawah sana.",
+                "Jilat dan hisap jarimu perlahan dengan erotis, tatap kamera seolah-olah itu adalah milikku.",
+                "Buka kancing/pakaian atasmu sedikit demi sedikit, perlihatkan belahan dada/asetmu, lalu gigit bibir bawahmu 5 detik.",
+                "Tarik napas panjang, lalu berikan aku 'dirty talk' paling kotor dan berani yang bisa kamu pikirkan sekarang.",
+                "Mundur dari kamera, lalu buat gerakan memompa atau mengayunkan pinggul dengan erotis selama 15 detik.",
+                "Raba dan pijat pelan bagian dadamu sendiri di depan kamera sambil memejamkan mata.",
+                "Beri ciuman paling basah dan sensual ke layar HP, bayangkan bibir dan lidahku membalasnya.",
+                "Letakkan tanganmu di balik celana/baju, dan buat ekspresi wajah seolah kamu sedang mencapai orgasme."
+            ],
+            ladderMsg: [
+                "G-Spot Tersentuh! Gairah memuncak drastis. Lompat ke kotak ",
+                "Sesi Foreplay Super Panas! Terangsang naik ke kotak ",
+                "Posisi 69 Sukses! Mendesah nikmat ke kotak "
+            ],
+            snakeMsg: [
+                "Terlalu Cepat Klimaks! Hukuman turun ke kotak ",
+                "Godaan Berbahaya. Kamu kehilangan kendali. Merosot ke kotak ",
+                "Loyo di Tengah Permainan! Kecewa dan mundur ke kotak "
+            ]
+        };
+
+        const boardEl = document.getElementById('board');
+        const tokenP1 = document.getElementById('token-p1');
+        const tokenP2 = document.getElementById('token-p2');
+        const diceDisplay = document.getElementById('dice-display');
+        const btnRoll = document.getElementById('btn-roll');
+        const p1Status = document.getElementById('p1-status');
+        const p2Status = document.getElementById('p2-status');
+        
+        // Modal elements
+        const modal = document.getElementById('action-modal');
+        const modalHeader = document.getElementById('modal-header');
+        const promptText = document.getElementById('prompt-text');
+        const promptSubtext = document.getElementById('prompt-subtext');
+        const modalCustomHtml = document.getElementById('modal-custom-html');
+        const btnCloseModal = document.getElementById('btn-close-modal');
+
+        let typewriterTimeout;
+
+        function initBoard() {
+            pathVisualMap.forEach((tileNum) => {
+                const cell = document.createElement('div');
+                cell.className = 'board-cell';
+                cell.id = `cell-${tileNum}`;
+                
+                // Show numbers on ends and special tiles to reduce clutter, or every 5
+                if(tileNum === 1 || tileNum === 100 || tileNum % 5 === 0 || ladders[tileNum] || snakes[tileNum] || specialTiles.includes(tileNum)) {
+                    cell.innerText = tileNum;
+                }
+
+                if (ladders[tileNum]) { cell.classList.add('ladder'); cell.innerHTML = '🪜'; }
+                if (snakes[tileNum]) { cell.classList.add('snake'); cell.innerHTML = '🐍'; }
+                if (specialTiles.includes(tileNum)) {
+                    cell.classList.add('special');
+                    cell.innerHTML = '💋';
+                    if (tileNum === 69) cell.innerHTML = '💦';
+                }
+                if (tileNum === finishTile) { cell.classList.add('finish'); cell.innerHTML = '👑'; }
+
+                boardEl.appendChild(cell);
+            });
+
+            updateTokenPosition('p1', gameState.p1.pos);
+            updateTokenPosition('p2', gameState.p2.pos);
+            updateTurnUI();
+        }
+
+        function updateTokenPosition(playerKey, tileNum) {
+            const cell = document.getElementById(`cell-${tileNum}`);
+            if (!cell) return;
+            
+            const token = playerKey === 'p1' ? tokenP1 : tokenP2;
+            const cellRect = cell.getBoundingClientRect();
+            const boardRect = boardEl.getBoundingClientRect();
+            
+            const centerX = (cellRect.left - boardRect.left) + (cellRect.width / 2);
+            const centerY = (cellRect.top - boardRect.top) + (cellRect.height / 2);
+
+            // Tighter offset for 10x10
+            const offset = 4;
+            const offsetX = playerKey === 'p1' ? -offset : offset;
+            const offsetY = playerKey === 'p1' ? -offset : offset;
+
+            token.style.left = `${centerX}px`;
+            token.style.top = `${centerY}px`;
+            token.style.transform = `translate(calc(-50% + ${offsetX}px), calc(-50% + ${offsetY}px))`;
+        }
+
+        function updateTurnUI() {
+            if (gameState.turn === 1) {
+                p1Status.classList.add('ring-2', 'ring-blue-500', 'bg-blue-500/20', 'opacity-100');
+                p1Status.classList.remove('opacity-50');
+                p2Status.classList.remove('ring-2', 'ring-pink-500', 'bg-pink-500/20', 'opacity-100');
+                p2Status.classList.add('opacity-50');
+                btnRoll.innerHTML = 'SUAMI LEMPAR DADU';
+                btnRoll.className = 'flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3 md:py-4 px-4 rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-all active:scale-95 flex justify-center items-center gap-2 text-sm md:text-base border border-blue-400/50';
+            } else {
+                p2Status.classList.add('ring-2', 'ring-pink-500', 'bg-pink-500/20', 'opacity-100');
+                p2Status.classList.remove('opacity-50');
+                p1Status.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-500/20', 'opacity-100');
+                p1Status.classList.add('opacity-50');
+                btnRoll.innerHTML = 'ISTRI LEMPAR DADU';
+                btnRoll.className = 'flex-1 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-bold py-3 md:py-4 px-4 rounded-xl shadow-[0_0_20px_rgba(225,29,72,0.5)] transition-all active:scale-95 flex justify-center items-center gap-2 text-sm md:text-base border border-rose-400/50 pulse-danger';
+            }
+        }
+
+        function rollDice() {
+            if (gameState.isMoving) return;
+            gameState.isMoving = true;
+            
+            const roll = Math.floor(Math.random() * 6) + 1;
+            
+            diceDisplay.classList.add('rolling');
+            diceDisplay.innerText = '🔥';
+            
+            setTimeout(() => {
+                diceDisplay.classList.remove('rolling');
+                diceDisplay.innerText = roll;
+                movePlayer(roll);
+            }, 500);
+        }
+
+        function movePlayer(roll) {
+            const playerKey = gameState.turn === 1 ? 'p1' : 'p2';
+            let currentPos = gameState[playerKey].pos;
+            let targetPos = currentPos + roll;
+            if (targetPos > finishTile) targetPos = finishTile;
+
+            let step = currentPos;
+            const stepInterval = setInterval(() => {
+                if (step < targetPos) {
+                    step++;
+                    gameState[playerKey].pos = step;
+                    updateTokenPosition(playerKey, step);
+                } else {
+                    clearInterval(stepInterval);
+                    checkTileEffects(playerKey, targetPos);
+                }
+            }, 250); // Fast stepping
+        }
+
+        function checkTileEffects(playerKey, pos) {
+            const playerName = gameState[playerKey].name;
+
+            if (pos === finishTile) {
+                triggerTypewriterModal('ORGASME PUNCAK 💦', 
+                    `🏆 Selamat ${playerName}!<br>Kamu memenangkan Kupon Eksklusif: "Bebas Request Gaya Terliar & Kendali Tubuh Sepenuhnya Semalaman". Screenshot sekarang!`, 
+                    '', 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black border-amber-300');
+                return; 
+            }
+
+            if (ladders[pos]) {
+                const newPos = ladders[pos];
+                const msg = prompts.ladderMsg[Math.floor(Math.random() * prompts.ladderMsg.length)] + newPos;
+                triggerTypewriterModal('TANGGA GAIRAH 🪜', msg, '', 'bg-emerald-600 border-emerald-400', () => {
+                    gameState[playerKey].pos = newPos;
+                    updateTokenPosition(playerKey, newPos);
+                    setTimeout(() => triggerRandomAction(playerName), 600);
+                });
+            } else if (snakes[pos]) {
+                const newPos = snakes[pos];
+                const msg = prompts.snakeMsg[Math.floor(Math.random() * prompts.snakeMsg.length)] + newPos;
+                triggerTypewriterModal('ULAR GODAAN 🐍', msg, '', 'bg-rose-700 border-rose-500', () => {
+                    gameState[playerKey].pos = newPos;
+                    updateTokenPosition(playerKey, newPos);
+                    setTimeout(() => triggerRandomAction(playerName), 600);
+                });
+            } else if (specialTiles.includes(pos)) {
+                triggerSpecialPhoto(playerName, pos);
+            } else {
+                triggerRandomAction(playerName);
+            }
+        }
+
+        function triggerRandomAction(playerName) {
+            const isTruth = Math.random() > 0.5;
+            const type = isTruth ? 'truth' : 'dare';
+            const text = prompts[type][Math.floor(Math.random() * prompts[type].length)];
+            
+            const title = isTruth ? 'TRUTH (JUJUR NAKAL) 💬' : 'DARE (TANTANGAN PANAS) 🔥';
+            const colorClass = isTruth ? 'bg-indigo-600 border-indigo-400' : 'bg-rose-600 border-rose-400';
+            const sub = `Giliran ${playerName} untuk menyelesaikan ini di depan kamera.`;
+            
+            let customHtml = "";
+            // Jika ada foto yang diupload, tampilkan foto acak di setiap Truth/Dare
+            if (gameState.uploadedPhotos && gameState.uploadedPhotos.length > 0) {
+                const randomPhoto = gameState.uploadedPhotos[Math.floor(Math.random() * gameState.uploadedPhotos.length)];
+                customHtml = `
+                    <div class="relative w-full h-40 mt-4 rounded-xl overflow-hidden border-2 border-rose-500/50 shadow-[0_0_15px_rgba(225,29,72,0.3)] cursor-pointer group" onclick="toggleBlur(this)">
+                        <img src="${randomPhoto}" class="w-full h-full object-cover transition-all duration-1000 sensor-blur" alt="Mood">
+                        <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none group-hover:opacity-100" id="tap-hint">
+                            <span class="bg-black/80 text-white text-[10px] px-3 py-1.5 rounded-full border border-rose-400 font-bold tracking-wider animate-pulse">TAP BUKA SENSOR</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            triggerTypewriterModal(title, text, sub, colorClass, endTurn, customHtml);
+        }
+
+        function triggerSpecialPhoto(playerName, tileNum) {
+            if (!gameState.uploadedPhotos || gameState.uploadedPhotos.length === 0) {
+                triggerTypewriterModal('KOTAK RAHASIA 💋', `Sayang sekali belum ada foto. Sebagai ganti, ${playerName} harus mendesah 5 detik!`, '', 'bg-fuchsia-600 border-fuchsia-400', endTurn);
+                return;
+            }
+
+            const is69 = tileNum === 69;
+            const title = is69 ? 'KOTAK 69 SPESIAL 💦' : 'KEJUTAN VISUAL 📸';
+            const sub = is69 ? `Bonus spesial. Selesaikan tantangan untuk buka sensor!` : `Selesaikan tantangan dari pasanganmu untuk buka sensornya.`;
+            
+            const randomPhoto = gameState.uploadedPhotos[Math.floor(Math.random() * gameState.uploadedPhotos.length)];
+            const customHtml = `
+                <div class="relative w-full aspect-square mt-4 rounded-xl overflow-hidden border-2 border-fuchsia-500 shadow-[0_0_20px_rgba(217,70,239,0.5)] cursor-pointer group" onclick="toggleBlur(this)">
+                    <img src="${randomPhoto}" class="w-full h-full object-cover transition-all duration-1000 sensor-blur" alt="Secret">
+                    <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none group-hover:opacity-100" id="tap-hint">
+                        <span class="bg-black/80 text-white text-xs px-4 py-2 rounded-full border border-fuchsia-400 font-bold tracking-wider animate-pulse">TAP BUKA SENSOR</span>
+                    </div>
+                </div>
+            `;
+
+            triggerTypewriterModal(title, "Ada foto menggoda tersembunyi menunggumu...", sub, 'bg-fuchsia-600 border-fuchsia-400', endTurn, customHtml);
+        }
+
+        function triggerTypewriterModal(title, mainText, subText, headerClass, onCloseCallback, customHtml = "") {
+            clearTimeout(typewriterTimeout);
+            
+            // Setup Reset
+            modalHeader.className = `text-white text-[10px] md:text-xs px-5 py-1.5 rounded-full font-bold tracking-widest shadow-[0_0_15px_currentColor] mb-5 z-10 border ${headerClass}`;
+            modalHeader.innerHTML = title;
+            
+            promptText.innerHTML = '';
+            promptSubtext.innerHTML = '';
+            promptSubtext.style.opacity = '0';
+            
+            modalCustomHtml.innerHTML = customHtml;
+            modalCustomHtml.classList.add('hidden');
+
+            btnCloseModal.style.opacity = '0';
+            btnCloseModal.style.pointerEvents = 'none';
+            btnCloseModal.classList.add('translate-y-4');
+            
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            // Typewriter loop
+            let i = 0;
+            const speed = 30; // speed of typing
+            promptText.classList.add('cursor-blink');
+
+            function typeWriter() {
+                if (i < mainText.length) {
+                    // Check for BR tag simulation (we pass plain text in prompts, but just in case)
+                    if(mainText.charAt(i) === '<') {
+                        // find end of tag (simplified)
+                        const end = mainText.indexOf('>', i);
+                        if(end !== -1) {
+                            promptText.innerHTML += mainText.substring(i, end + 1);
+                            i = end + 1;
+                        } else {
+                            promptText.innerHTML += mainText.charAt(i);
+                            i++;
+                        }
+                    } else {
+                        promptText.innerHTML += mainText.charAt(i);
+                        i++;
+                    }
+                    typewriterTimeout = setTimeout(typeWriter, speed);
+                } else {
+                    // Typing finished
+                    promptText.classList.remove('cursor-blink');
+                    
+                    if (subText) {
+                        promptSubtext.innerHTML = subText;
+                        promptSubtext.style.opacity = '1';
+                    }
+
+                    if (customHtml) {
+                        modalCustomHtml.classList.remove('hidden');
+                        modalCustomHtml.classList.add('animate-[popIn_0.5s_ease_forwards]');
+                    }
+                    
+                    // Show button
+                    setTimeout(() => {
+                        btnCloseModal.style.opacity = '1';
+                        btnCloseModal.style.pointerEvents = 'auto';
+                        btnCloseModal.classList.remove('translate-y-4');
+                    }, 500);
+                }
+            }
+
+            typeWriter();
+
+            // Bind click
+            btnCloseModal.onclick = () => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                if (onCloseCallback) onCloseCallback();
+            };
+        }
+
+        window.toggleBlur = function(container) {
+            const img = container.querySelector('img');
+            const hint = container.querySelector('#tap-hint');
+            if (img.classList.contains('sensor-blur')) {
+                img.classList.remove('sensor-blur');
+                img.classList.add('blur-none', 'scale-100');
+                if(hint) hint.style.opacity = '0';
+            } else {
+                img.classList.add('sensor-blur');
+                img.classList.remove('blur-none', 'scale-100');
+                if(hint) hint.style.opacity = '1';
+            }
+        };
+
+        function endTurn() {
+            gameState.turn = gameState.turn === 1 ? 2 : 1;
+            gameState.isMoving = false;
+            updateTurnUI();
+            diceDisplay.innerText = '🎲';
+        }
+
+        window.handlePhotoUpload = function(event) {
+            const files = event.target.files;
+            if (files && files.length > 0) {
+                gameState.uploadedPhotos = [];
+                for (let i = 0; i < files.length; i++) {
+                    gameState.uploadedPhotos.push(URL.createObjectURL(files[i]));
+                }
+                
+                // Update badge indikator jumlah foto
+                const countBadge = document.getElementById('photo-count');
+                if (countBadge) {
+                    countBadge.innerText = files.length;
+                    countBadge.classList.remove('hidden');
+                }
+
+                triggerTypewriterModal('SISTEM AMAN', `✅ ${files.length} Foto memancing gairah berhasil dimuat secara lokal. Gambar akan muncul secara acak setiap ada arahan Truth/Dare! 100% Aman.`, '', 'bg-emerald-600 border-emerald-400', null);
+            }
+        };
+
+        // Background Particles
+        const particlesContainer = document.getElementById('particles');
+        for (let i = 0; i < 30; i++) {
+            const particle = document.createElement('div');
+            const size = Math.random() * 4 + 2;
+            particle.style.position = 'absolute';
+            particle.style.width = `${size}px`;
+            particle.style.height = `${size}px`;
+            particle.style.backgroundColor = Math.random() > 0.5 ? '#f43f5e' : '#d946ef'; 
+            particle.style.borderRadius = '50%';
+            particle.style.left = `${Math.random() * 100}vw`;
+            particle.style.top = `${Math.random() * 100}vh`;
+            particle.style.opacity = Math.random() * 0.4 + 0.1;
+            particle.style.filter = 'blur(3px)';
+            
+            particle.animate([
+                { transform: `translate(0, 0)`, opacity: particle.style.opacity },
+                { transform: `translate(${Math.random() * 100 - 50}px, -${Math.random() * 200 + 100}px)`, opacity: 0 }
+            ], {
+                duration: (Math.random() * 10 + 10) * 1000,
+                delay: Math.random() * 5 * 1000,
+                iterations: Infinity,
+                easing: 'ease-in-out'
+            });
+            particlesContainer.appendChild(particle);
+        }
+
+        window.onload = () => {
+            initBoard();
+            window.addEventListener('resize', () => {
+                updateTokenPosition('p1', gameState.p1.pos);
+                updateTokenPosition('p2', gameState.p2.pos);
+            });
+        };
+    </script>
+</body>
+</html>
