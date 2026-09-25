@@ -244,8 +244,80 @@
         </div>
     </div>
 
+    <!-- Multiplayer Lobby -->
+    <div id="lobby-modal" class="fixed inset-0 bg-black/95 backdrop-blur-lg z-[60] flex flex-col items-center justify-center p-4">
+        <div class="bg-slate-900/90 border-2 border-rose-600 rounded-3xl w-full max-w-sm p-6 flex flex-col items-center text-center shadow-[0_0_50px_rgba(225,29,72,0.4)] relative overflow-hidden">
+            <div class="absolute -top-20 -right-20 w-40 h-40 bg-rose-600/30 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <h2 class="title-font text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-fuchsia-500 drop-shadow-md mb-2">Mode Jarak Jauh</h2>
+            <p class="text-[11px] text-rose-300 mb-6 font-light">Hubungkan HP Suami & Istri agar permainan tersinkronisasi *real-time* via internet!</p>
+            
+            <div id="lobby-status" class="text-emerald-400 text-xs font-bold mb-4 hidden animate-pulse">Menghubungkan ke server aman...</div>
+            
+            <div class="w-full flex flex-col gap-3" id="lobby-buttons">
+                <button onclick="window.createRoom()" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-[0_0_15px_rgba(59,130,246,0.4)] text-sm">
+                    👨 BIKIN ROOM (SUAMI)
+                </button>
+                <div class="flex items-center w-full my-1">
+                    <hr class="flex-1 border-slate-700"><span class="px-3 text-slate-500 text-[10px] font-bold">ATAU KODE DARI SUAMI</span><hr class="flex-1 border-slate-700">
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="room-code-input" placeholder="KODE" maxlength="4" class="w-1/2 bg-slate-800 border-2 border-pink-500/50 text-white text-center py-3 rounded-xl uppercase text-xl font-bold tracking-widest focus:outline-none focus:border-pink-400 shadow-[0_0_10px_rgba(236,72,153,0.2)inset]">
+                    <button onclick="window.joinRoom()" class="w-1/2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-bold py-3 rounded-xl transition-all shadow-[0_0_15px_rgba(225,29,72,0.4)] text-sm">
+                        👩 GABUNG
+                    </button>
+                </div>
+                <button onclick="window.startOffline()" class="mt-4 text-xs text-slate-500 underline hover:text-rose-400 transition-colors">Main Berdua di 1 HP (Offline)</button>
+            </div>
+
+            <div id="room-wait" class="w-full hidden flex-col items-center mt-4">
+                <p class="text-sm text-slate-300">Berikan 4 angka ini ke Istri:</p>
+                <div id="room-code-display" class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-fuchsia-500 tracking-widest my-4 bg-slate-950/80 px-8 py-3 rounded-2xl border border-rose-500/50 shadow-[0_0_25px_rgba(225,29,72,0.3)]">----</div>
+                <p class="text-[10px] text-rose-300 animate-pulse bg-rose-900/40 px-3 py-1 rounded-full">Menunggu Istri bergabung...</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Firebase Configuration Injector
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'ldr-intimate-game';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const customToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        if (firebaseConfig) {
+            try {
+                const app = initializeApp(firebaseConfig);
+                const db = getFirestore(app);
+                const auth = getAuth(app);
+                
+                // Expose to window for global access by game logic
+                window.fbDb = db;
+                window.fbAuth = auth;
+                window.fbSignIn = async () => {
+                    if (customToken) { await signInWithCustomToken(auth, customToken); } 
+                    else { await signInAnonymously(auth); }
+                    return auth.currentUser;
+                };
+                window.fbDoc = doc;
+                window.fbSetDoc = setDoc;
+                window.fbUpdateDoc = updateDoc;
+                window.fbGetDoc = getDoc;
+                window.fbOnSnapshot = onSnapshot;
+                window.fbAppId = appId;
+                window.firebaseReady = true;
+            } catch(e) {
+                console.error("Firebase init err:", e);
+                window.firebaseReady = false;
+            }
+        }
+    </script>
+
     <script>
-        //        // --- AUDIO SYNTH SETUP (TONE.JS) ---
+        // --- AUDIO SYNTH SETUP (TONE.JS) ---
         let footstepSynth, breathSynth, breathFilter, heartbeatSynth, heartbeatLoop;
         
         // 10x10 Board Generation Logic (1 to 100 Serpentine)
@@ -256,14 +328,14 @@
             for(let i=0; i<10; i++) {
                 rowTiles.push(rowStart + i);
             }
-            if (row % 2 !== 0) rowTiles.reverse(); // Bends the snake
+            if (row % 2 !== 0) rowTiles.reverse();
             pathVisualMap.push(...rowTiles);
         }
 
         // Steamy Mechanics Setup
         const ladders = { 4:14, 12:31, 20:38, 28:84, 40:59, 51:67, 63:81, 71:91 };
         const snakes = { 17:7, 34:1, 54:34, 62:19, 64:60, 87:24, 93:73, 95:75, 99:78 };
-        const specialTiles = [15, 33, 69, 88]; // 69 is mandatory 😏
+        const specialTiles = [15, 33, 69, 88];
         const finishTile = 100;
 
         let gameState = {
@@ -275,42 +347,28 @@
             audioInited: false
         };
 
+        // Multiplayer State
+        window.myRole = null; 
+        window.roomCode = null;
+        window.lastTriggerId = null;
+
         async function initAudio() {
             if (gameState.audioInited) return;
-            await Tone.start();
-            
-            // Synth Suara Langkah
-            footstepSynth = new Tone.NoiseSynth({
-                noise: { type: 'brown' },
-                envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 }
-            }).toDestination();
-            footstepSynth.volume.value = -15;
-
-            // Synth Desahan / Tarikan Napas Berat
-            breathFilter = new Tone.Filter(1500, "lowpass").toDestination();
-            breathSynth = new Tone.NoiseSynth({
-                noise: { type: 'pink' },
-                envelope: { attack: 0.5, decay: 1.5, sustain: 0.2, release: 2 }
-            }).connect(breathFilter);
-            breathSynth.volume.value = -2;
-
-            // Synth Detak Jantung
-            heartbeatSynth = new Tone.MembraneSynth({
-                pitchDecay: 0.05,
-                octave: 1,
-                oscillator: { type: "sine" },
-                envelope: { attack: 0.01, decay: 0.4, sustain: 0.01, release: 1.4 }
-            }).toDestination();
-            heartbeatSynth.volume.value = 0;
-            
-            Tone.Transport.start();
-            gameState.audioInited = true;
+            try {
+                await Tone.start();
+                footstepSynth = new Tone.NoiseSynth({ noise: { type: 'brown' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 } }).toDestination();
+                footstepSynth.volume.value = -3; 
+                breathFilter = new Tone.Filter(1500, "lowpass").toDestination();
+                breathSynth = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.5, decay: 1.5, sustain: 0.2, release: 2 } }).connect(breathFilter);
+                breathSynth.volume.value = 8; 
+                heartbeatSynth = new Tone.MembraneSynth({ pitchDecay: 0.05, octave: 2, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 0.4, sustain: 0.01, release: 1.4 } }).toDestination();
+                heartbeatSynth.volume.value = 10; 
+                Tone.Transport.start();
+                gameState.audioInited = true;
+            } catch(e) { console.warn("Audio init failed", e); }
         }
 
-        function playFootstep() {
-            if(gameState.audioInited && footstepSynth) footstepSynth.triggerAttackRelease("16n");
-        }
-
+        function playFootstep() { if(gameState.audioInited && footstepSynth) footstepSynth.triggerAttackRelease("16n"); }
         function playMoan() {
             if(gameState.audioInited && breathSynth && breathFilter) {
                 breathFilter.frequency.rampTo(4000, 0.5);
@@ -318,43 +376,34 @@
                 setTimeout(() => breathFilter.frequency.rampTo(800, 1.5), 500);
             }
         }
-
         function toggleHeartbeat(play) {
             if (!gameState.audioInited) return;
             if (play) {
                 if (heartbeatLoop) heartbeatLoop.dispose();
                 heartbeatLoop = new Tone.Loop(time => {
-                    heartbeatSynth.triggerAttackRelease("C1", "8n", time);
-                    heartbeatSynth.triggerAttackRelease("C1", "8n", time + 0.35);
+                    heartbeatSynth.triggerAttackRelease("C2", "8n", time);
+                    heartbeatSynth.triggerAttackRelease("C2", "8n", time + 0.35);
                 }, "1n").start(0);
             } else {
                 if (heartbeatLoop) heartbeatLoop.stop();
             }
         }
 
-        // Sound Effects (Tone.js) Setup for UI sounds
         const sfx = {
-            init: false,
-            synth: null,
-            noise: null,
+            init: false, synth: null, noise: null,
             setup: async function() {
                 if (this.init) return;
-                this.synth = new Tone.PolySynth(Tone.Synth, {
-                    oscillator: { type: "triangle" }
-                }).toDestination();
-                this.noise = new Tone.NoiseSynth({
-                    noise: { type: "white" },
-                    envelope: { attack: 0.01, decay: 0.1, sustain: 0 }
-                }).toDestination();
-                this.synth.volume.value = -8; // Volume melodi
-                this.noise.volume.value = -12; // Volume dadu
-                this.init = true;
+                try {
+                    this.synth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "triangle" } }).toDestination();
+                    this.noise = new Tone.NoiseSynth({ noise: { type: "white" }, envelope: { attack: 0.01, decay: 0.1, sustain: 0 } }).toDestination();
+                    this.synth.volume.value = 2; this.noise.volume.value = -3;
+                    this.init = true;
+                } catch(e) {}
             },
             rollDice: async function() {
                 if (!this.init) await this.setup();
                 if (!this.noise) return;
                 const now = Tone.now();
-                // Mensimulasikan suara dadu yang dikocok
                 this.noise.triggerAttackRelease("32n", now);
                 this.noise.triggerAttackRelease("32n", now + 0.1);
                 this.noise.triggerAttackRelease("32n", now + 0.25);
@@ -364,14 +413,12 @@
             popup: async function() {
                 if (!this.init) await this.setup();
                 if (!this.synth) return;
-                // Suara "cling" saat pertanyaan muncul
                 this.synth.triggerAttackRelease("C5", "8n", Tone.now());
                 this.synth.triggerAttackRelease("E5", "8n", Tone.now() + 0.1);
             },
             snake: async function() {
                 if (!this.init) await this.setup();
                 if (!this.synth) return;
-                // Suara merosot turun (ular)
                 this.synth.triggerAttackRelease("G4", "8n", Tone.now());
                 this.synth.triggerAttackRelease("Eb4", "8n", Tone.now() + 0.2);
                 this.synth.triggerAttackRelease("C4", "4n", Tone.now() + 0.4);
@@ -379,7 +426,6 @@
             ladder: async function() {
                 if (!this.init) await this.setup();
                 if (!this.synth) return;
-                // Suara naik tangga (gairah naik)
                 this.synth.triggerAttackRelease("C4", "8n", Tone.now());
                 this.synth.triggerAttackRelease("G4", "8n", Tone.now() + 0.15);
                 this.synth.triggerAttackRelease("C5", "4n", Tone.now() + 0.3);
@@ -412,14 +458,14 @@
                 "Tatap mataku tajam di layar, desahkan kalimat kotor ini dengan sensual: 'Sayang, aku sangat basah/keras untukmu sekarang, tolong puaskan aku...'"
             ],
             ladderMsg: [
-                "G-Spot Tersentuh Tepat Sasaran! Gairah meledak hebat. Lompat ke kotak ",
-                "Foreplay Panas Tak Tertahankan! Tubuhmu memanas, naik ke kotak ",
+                "G-Spot Tersentuh Tepat Sasaran! Gairah meledak hebat. Melompat liar ke kotak ",
+                "Foreplay Panas Tak Tertahankan! Tubuhmu memanas, naik kencang ke kotak ",
                 "Posisi 69 Super Basah! Mendesah nikmat menembus ke kotak "
             ],
             snakeMsg: [
                 "Terlalu Cepat Klimaks (Ejakulasi Dini)! Lemas dan dihukum merosot ke kotak ",
-                "Godaan Berbahaya! Kamu kehilangan kendali orgasme. Jatuh ke kotak ",
-                "Loyo di Tengah Permainan! Kecewa dan dipaksa mundur ke kotak "
+                "Godaan Berbahaya! Kamu kehilangan kendali orgasme. Jatuh merintih ke kotak ",
+                "Loyo di Tengah Permainan! Kecewa dan dipaksa mundur memalukan ke kotak "
             ]
         };
 
@@ -441,29 +487,120 @@
 
         let typewriterTimeout;
 
+        window.unlockAudio = async function() {
+            if (!gameState.audioInited) {
+                await initAudio();
+                await sfx.setup();
+            }
+        };
+
+        window.startOffline = function() {
+            document.getElementById('lobby-modal').style.display = 'none';
+            window.roomCode = null;
+            window.myRole = null;
+            window.unlockAudio();
+            updateTurnUI();
+        };
+
+        window.createRoom = async function() {
+            if(!window.firebaseReady) return alert("Sistem sinkronisasi sedang dimuat, tunggu sebentar.");
+            try {
+                document.getElementById('lobby-status').classList.remove('hidden');
+                document.getElementById('lobby-buttons').classList.add('hidden');
+                
+                await window.fbSignIn();
+                const code = Math.floor(1000 + Math.random() * 9000).toString(); 
+                window.myRole = 'p1';
+                window.roomCode = code;
+                
+                const roomRef = window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', 'rooms', code);
+                await window.fbSetDoc(roomRef, {
+                    p1Pos: 1, p2Pos: 1, turn: 1,
+                    trigger: null,
+                    players: 1,
+                    timestamp: Date.now()
+                });
+                
+                document.getElementById('room-wait').classList.remove('hidden');
+                document.getElementById('room-code-display').innerText = code;
+                startSync(roomRef);
+            } catch(e) { 
+                alert("Gagal membuat Room. Main mode Offline saja."); 
+                console.error(e); 
+                window.startOffline(); 
+            }
+        };
+
+        window.joinRoom = async function() {
+            if(!window.firebaseReady) return alert("Tunggu sebentar...");
+            const code = document.getElementById('room-code-input').value.trim().toUpperCase();
+            if(!code || code.length !== 4) return alert("Masukkan 4 digit kode dari Suami.");
+            
+            try {
+                document.getElementById('lobby-status').classList.remove('hidden');
+                document.getElementById('lobby-buttons').classList.add('hidden');
+
+                await window.fbSignIn();
+                window.myRole = 'p2';
+                window.roomCode = code;
+                
+                const roomRef = window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', 'rooms', code);
+                const docSnap = await window.fbGetDoc(roomRef);
+                
+                if (docSnap.exists()) {
+                    await window.fbUpdateDoc(roomRef, { players: 2 });
+                    document.getElementById('lobby-modal').style.display = 'none';
+                    window.unlockAudio();
+                    startSync(roomRef);
+                } else {
+                    alert("Kode Room tidak ditemukan!");
+                    document.getElementById('lobby-status').classList.add('hidden');
+                    document.getElementById('lobby-buttons').classList.remove('hidden');
+                }
+            } catch(e) { console.error(e); }
+        };
+
+        function startSync(roomRef) {
+            window.fbOnSnapshot(roomRef, (docSnap) => {
+                const data = docSnap.data();
+                if(!data) return;
+                
+                if (data.players === 2 && document.getElementById('lobby-modal').style.display !== 'none') {
+                    document.getElementById('lobby-modal').style.display = 'none';
+                    window.unlockAudio();
+                }
+
+                if (data.trigger && data.trigger.id !== window.lastTriggerId) {
+                    window.lastTriggerId = data.trigger.id;
+                    const playerKey = data.trigger.playerKey;
+                    
+                    // Update turn based on DB instantly to lock buttons
+                    gameState.turn = data.turn;
+                    updateTurnUI();
+                    
+                    animateSyncedMove(playerKey, data.trigger);
+                }
+            }, (err) => console.error("Sync error:", err));
+        }
+
         function initBoard() {
             pathVisualMap.forEach((tileNum) => {
                 const cell = document.createElement('div');
                 cell.className = 'board-cell';
                 cell.id = `cell-${tileNum}`;
                 
-                // Show numbers on ends and special tiles to reduce clutter, or every 5
                 if(tileNum === 1 || tileNum === 100 || tileNum % 5 === 0 || ladders[tileNum] || snakes[tileNum] || specialTiles.includes(tileNum)) {
                     cell.innerText = tileNum;
                 }
-
                 if (ladders[tileNum]) { cell.classList.add('ladder'); cell.innerHTML = '🪜'; }
                 if (snakes[tileNum]) { cell.classList.add('snake'); cell.innerHTML = '🐍'; }
                 if (specialTiles.includes(tileNum)) {
                     cell.classList.add('special');
-                    cell.innerHTML = '💋';
-                    if (tileNum === 69) cell.innerHTML = '💦';
+                    cell.innerHTML = tileNum === 69 ? '💦' : '💋';
                 }
                 if (tileNum === finishTile) { cell.classList.add('finish'); cell.innerHTML = '👑'; }
-
                 boardEl.appendChild(cell);
             });
-
             updateTokenPosition('p1', gameState.p1.pos);
             updateTokenPosition('p2', gameState.p2.pos);
             updateTurnUI();
@@ -472,7 +609,6 @@
         function updateTokenPosition(playerKey, tileNum) {
             const cell = document.getElementById(`cell-${tileNum}`);
             if (!cell) return;
-            
             const token = playerKey === 'p1' ? tokenP1 : tokenP2;
             const cellRect = cell.getBoundingClientRect();
             const boardRect = boardEl.getBoundingClientRect();
@@ -480,7 +616,6 @@
             const centerX = (cellRect.left - boardRect.left) + (cellRect.width / 2);
             const centerY = (cellRect.top - boardRect.top) + (cellRect.height / 2);
 
-            // Tighter offset for 10x10
             const offset = 4;
             const offsetX = playerKey === 'p1' ? -offset : offset;
             const offsetY = playerKey === 'p1' ? -offset : offset;
@@ -491,114 +626,165 @@
         }
 
         function updateTurnUI() {
-            if (gameState.turn === 1) {
+            const isP1Turn = gameState.turn === 1;
+            const isMyTurn = !window.myRole || (window.myRole === 'p1' && isP1Turn) || (window.myRole === 'p2' && !isP1Turn);
+
+            if (isP1Turn) {
                 p1Status.classList.add('ring-2', 'ring-blue-500', 'bg-blue-500/20', 'opacity-100');
                 p1Status.classList.remove('opacity-50');
                 p2Status.classList.remove('ring-2', 'ring-pink-500', 'bg-pink-500/20', 'opacity-100');
                 p2Status.classList.add('opacity-50');
-                btnRoll.innerHTML = 'SUAMI LEMPAR DADU';
-                btnRoll.className = 'flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3 md:py-4 px-4 rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-all active:scale-95 flex justify-center items-center gap-2 text-sm md:text-base border border-blue-400/50';
+                
+                if (isMyTurn) {
+                    btnRoll.innerHTML = 'SUAMI LEMPAR DADU';
+                    btnRoll.className = 'flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3 md:py-4 px-4 rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-all active:scale-95 flex justify-center items-center gap-2 text-sm md:text-base border border-blue-400/50 pulse-danger cursor-pointer';
+                } else {
+                    btnRoll.innerHTML = 'MENUNGGU SUAMI...';
+                    btnRoll.className = 'flex-1 bg-slate-800 text-slate-400 font-bold py-3 md:py-4 px-4 rounded-xl border border-slate-700 flex justify-center items-center gap-2 text-sm md:text-base cursor-not-allowed';
+                }
             } else {
                 p2Status.classList.add('ring-2', 'ring-pink-500', 'bg-pink-500/20', 'opacity-100');
                 p2Status.classList.remove('opacity-50');
                 p1Status.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-500/20', 'opacity-100');
                 p1Status.classList.add('opacity-50');
-                btnRoll.innerHTML = 'ISTRI LEMPAR DADU';
-                btnRoll.className = 'flex-1 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-bold py-3 md:py-4 px-4 rounded-xl shadow-[0_0_20px_rgba(225,29,72,0.5)] transition-all active:scale-95 flex justify-center items-center gap-2 text-sm md:text-base border border-rose-400/50 pulse-danger';
+                
+                if (isMyTurn) {
+                    btnRoll.innerHTML = 'ISTRI LEMPAR DADU';
+                    btnRoll.className = 'flex-1 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-bold py-3 md:py-4 px-4 rounded-xl shadow-[0_0_20px_rgba(225,29,72,0.5)] transition-all active:scale-95 flex justify-center items-center gap-2 text-sm md:text-base border border-rose-400/50 pulse-danger cursor-pointer';
+                } else {
+                    btnRoll.innerHTML = 'MENUNGGU ISTRI...';
+                    btnRoll.className = 'flex-1 bg-slate-800 text-slate-400 font-bold py-3 md:py-4 px-4 rounded-xl border border-slate-700 flex justify-center items-center gap-2 text-sm md:text-base cursor-not-allowed';
+                }
             }
         }
 
         window.rollDice = async function() {
             if (gameState.isMoving) return;
+            const currentTurnKey = gameState.turn === 1 ? 'p1' : 'p2';
             
-            // Initialize Audio safely on first user interaction
-            if (!gameState.audioInited) {
-                await initAudio();
-                await sfx.setup();
-            }
+            // Prevent rolling if in multiplayer and not local turn
+            if (window.myRole && currentTurnKey !== window.myRole) return;
 
+            await window.unlockAudio();
             gameState.isMoving = true;
             sfx.rollDice();
             
             const roll = Math.floor(Math.random() * 6) + 1;
-            
             diceDisplay.classList.add('rolling');
             diceDisplay.innerText = '🔥';
             
             setTimeout(() => {
                 diceDisplay.classList.remove('rolling');
                 diceDisplay.innerText = roll;
-                movePlayer(roll);
+                calculateAndPushMove(roll, currentTurnKey);
             }, 500);
         };
 
-        function movePlayer(roll) {
-            const playerKey = gameState.turn === 1 ? 'p1' : 'p2';
-            let currentPos = gameState[playerKey].pos;
-            let targetPos = currentPos + roll;
+        async function calculateAndPushMove(roll, playerKey) {
+            const playerName = gameState[playerKey].name;
+            let targetPos = gameState[playerKey].pos + roll;
             if (targetPos > finishTile) targetPos = finishTile;
 
+            let finalPos = targetPos;
+            let isSpecial = false;
+            let title = "", text = "", sub = "", colorClass = "";
+
+            if (finalPos === finishTile) {
+                title = 'ORGASME PUNCAK 💦';
+                text = `🏆 Selamat ${playerName}!<br>Kamu memenangkan Kupon Eksklusif: "Bebas Request Gaya Terliar & Kendali Tubuh Sepenuhnya Semalaman". Screenshot sekarang!`;
+                colorClass = 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black border-amber-300';
+            } else if (ladders[targetPos]) {
+                finalPos = ladders[targetPos];
+                title = 'TANGGA GAIRAH 🪜';
+                text = prompts.ladderMsg[Math.floor(Math.random() * prompts.ladderMsg.length)] + finalPos;
+                colorClass = 'bg-emerald-600 border-emerald-400';
+                isSpecial = true;
+            } else if (snakes[targetPos]) {
+                finalPos = snakes[targetPos];
+                title = 'ULAR GODAAN 🐍';
+                text = prompts.snakeMsg[Math.floor(Math.random() * prompts.snakeMsg.length)] + finalPos;
+                colorClass = 'bg-rose-700 border-rose-500';
+                isSpecial = true;
+            } else if (specialTiles.includes(targetPos)) {
+                title = targetPos === 69 ? 'KOTAK 69 SPESIAL 💦' : 'KEJUTAN VISUAL 📸';
+                text = "Ada foto menggoda tersembunyi menunggumu...";
+                sub = targetPos === 69 ? `Bonus spesial. Selesaikan tantangan untuk buka sensor!` : `Selesaikan tantangan dari pasanganmu untuk buka sensornya.`;
+                colorClass = 'bg-fuchsia-600 border-fuchsia-400';
+                isSpecial = 'photo';
+            } else {
+                const isTruth = Math.random() > 0.5;
+                const type = isTruth ? 'truth' : 'dare';
+                text = prompts[type][Math.floor(Math.random() * prompts[type].length)];
+                title = isTruth ? 'TRUTH (JUJUR NAKAL) 💬' : 'DARE (TANTANGAN PANAS) 🔥';
+                colorClass = isTruth ? 'bg-indigo-600 border-indigo-400' : 'bg-rose-600 border-rose-400';
+                sub = `Giliran ${playerName} untuk menyelesaikan ini di depan kamera.`;
+                isSpecial = 'standard';
+            }
+
+            if(isSpecial === true) {
+                const type = Math.random() > 0.5 ? 'truth' : 'dare';
+                const actionText = prompts[type][Math.floor(Math.random() * prompts[type].length)];
+                text += `<br><br><span class="text-sm font-normal text-white">Lalu lakukan ini:<br>${actionText}</span>`;
+                sub = `Giliran ${playerName} untuk menyelesaikan ini di depan kamera.`;
+            }
+
+            const triggerId = Math.random().toString(36).substring(2, 9);
+            const nextTurn = gameState.turn === 1 ? 2 : 1;
+
+            const triggerData = {
+                id: triggerId, playerKey: playerKey, targetPos: targetPos, finalPos: finalPos,
+                title: title, text: text, sub: sub, colorClass: colorClass,
+                isPhotoTrigger: (isSpecial === 'photo' || isSpecial === 'standard') 
+            };
+
+            const payload = { turn: nextTurn, trigger: triggerData };
+            payload[`${playerKey}Pos`] = finalPos;
+
+            if (window.roomCode && window.fbUpdateDoc) {
+                const roomRef = window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', 'rooms', window.roomCode);
+                await window.fbUpdateDoc(roomRef, payload);
+            } else {
+                // Offline fallback
+                window.lastTriggerId = triggerId;
+                gameState.turn = nextTurn;
+                updateTurnUI();
+                animateSyncedMove(playerKey, triggerData);
+            }
+        }
+
+        function animateSyncedMove(playerKey, trigger) {
+            gameState.isMoving = true;
+            let currentPos = gameState[playerKey].pos;
             let step = currentPos;
+            
             const stepInterval = setInterval(() => {
-                if (step < targetPos) {
+                if (step < trigger.targetPos) {
                     step++;
                     gameState[playerKey].pos = step;
                     updateTokenPosition(playerKey, step);
-                    playFootstep(); // Putar suara langkah kaki
+                    playFootstep();
                 } else {
                     clearInterval(stepInterval);
-                    checkTileEffects(playerKey, targetPos);
+                    if(trigger.targetPos !== trigger.finalPos) {
+                        if(trigger.finalPos > trigger.targetPos) sfx.ladder();
+                        else sfx.snake();
+                        
+                        setTimeout(() => {
+                            gameState[playerKey].pos = trigger.finalPos;
+                            updateTokenPosition(playerKey, trigger.finalPos);
+                            showTriggerModal(trigger);
+                        }, 600);
+                    } else {
+                        showTriggerModal(trigger);
+                    }
                 }
-            }, 250); // Fast stepping
+            }, 250);
         }
 
-        function checkTileEffects(playerKey, pos) {
-            const playerName = gameState[playerKey].name;
-
-            if (pos === finishTile) {
-                triggerTypewriterModal('ORGASME PUNCAK 💦', 
-                    `🏆 Selamat ${playerName}!<br>Kamu memenangkan Kupon Eksklusif: "Bebas Request Gaya Terliar & Kendali Tubuh Sepenuhnya Semalaman". Screenshot sekarang!`, 
-                    '', 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black border-amber-300');
-                return; 
-            }
-
-            if (ladders[pos]) {
-                sfx.ladder();
-                const newPos = ladders[pos];
-                const msg = prompts.ladderMsg[Math.floor(Math.random() * prompts.ladderMsg.length)] + newPos;
-                triggerTypewriterModal('TANGGA GAIRAH 🪜', msg, '', 'bg-emerald-600 border-emerald-400', () => {
-                    gameState[playerKey].pos = newPos;
-                    updateTokenPosition(playerKey, newPos);
-                    setTimeout(() => triggerRandomAction(playerName), 600);
-                });
-            } else if (snakes[pos]) {
-                sfx.snake();
-                const newPos = snakes[pos];
-                const msg = prompts.snakeMsg[Math.floor(Math.random() * prompts.snakeMsg.length)] + newPos;
-                triggerTypewriterModal('ULAR GODAAN 🐍', msg, '', 'bg-rose-700 border-rose-500', () => {
-                    gameState[playerKey].pos = newPos;
-                    updateTokenPosition(playerKey, newPos);
-                    setTimeout(() => triggerRandomAction(playerName), 600);
-                });
-            } else if (specialTiles.includes(pos)) {
-                triggerSpecialPhoto(playerName, pos);
-            } else {
-                triggerRandomAction(playerName);
-            }
-        }
-
-        function triggerRandomAction(playerName) {
-            const isTruth = Math.random() > 0.5;
-            const type = isTruth ? 'truth' : 'dare';
-            const text = prompts[type][Math.floor(Math.random() * prompts[type].length)];
-            
-            const title = isTruth ? 'TRUTH (JUJUR NAKAL) 💬' : 'DARE (TANTANGAN PANAS) 🔥';
-            const colorClass = isTruth ? 'bg-indigo-600 border-indigo-400' : 'bg-rose-600 border-rose-400';
-            const sub = `Giliran ${playerName} untuk menyelesaikan ini di depan kamera.`;
-            
+        function showTriggerModal(trigger) {
             let customHtml = "";
-            // Jika ada foto yang diupload, tampilkan foto acak di setiap Truth/Dare
-            if (gameState.uploadedPhotos && gameState.uploadedPhotos.length > 0) {
+            // Foto lokal user tetap tersimpan secara rahasia dan ditampilkan secara acak
+            if (trigger.isPhotoTrigger && gameState.uploadedPhotos && gameState.uploadedPhotos.length > 0) {
                 const randomPhoto = gameState.uploadedPhotos[Math.floor(Math.random() * gameState.uploadedPhotos.length)];
                 customHtml = `
                     <div class="relative w-full h-40 mt-4 rounded-xl overflow-hidden border-2 border-rose-500/50 shadow-[0_0_15px_rgba(225,29,72,0.3)] cursor-pointer group" onclick="toggleBlur(this)">
@@ -610,42 +796,19 @@
                 `;
             }
 
-            triggerTypewriterModal(title, text, sub, colorClass, endTurn, customHtml);
-        }
-
-        function triggerSpecialPhoto(playerName, tileNum) {
-            if (!gameState.uploadedPhotos || gameState.uploadedPhotos.length === 0) {
-                triggerTypewriterModal('KOTAK RAHASIA 💋', `Sayang sekali belum ada foto. Sebagai ganti, ${playerName} harus mendesah 5 detik!`, '', 'bg-fuchsia-600 border-fuchsia-400', endTurn);
-                return;
-            }
-
-            const is69 = tileNum === 69;
-            const title = is69 ? 'KOTAK 69 SPESIAL 💦' : 'KEJUTAN VISUAL 📸';
-            const sub = is69 ? `Bonus spesial. Selesaikan tantangan untuk buka sensor!` : `Selesaikan tantangan dari pasanganmu untuk buka sensornya.`;
-            
-            const randomPhoto = gameState.uploadedPhotos[Math.floor(Math.random() * gameState.uploadedPhotos.length)];
-            const customHtml = `
-                <div class="relative w-full aspect-square mt-4 rounded-xl overflow-hidden border-2 border-fuchsia-500 shadow-[0_0_20px_rgba(217,70,239,0.5)] cursor-pointer group" onclick="toggleBlur(this)">
-                    <img src="${randomPhoto}" class="w-full h-full object-cover transition-all duration-1000 sensor-blur" alt="Secret">
-                    <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none group-hover:opacity-100" id="tap-hint">
-                        <span class="bg-black/80 text-white text-xs px-4 py-2 rounded-full border border-fuchsia-400 font-bold tracking-wider animate-pulse">TAP BUKA SENSOR</span>
-                    </div>
-                </div>
-            `;
-
-            triggerTypewriterModal(title, "Ada foto menggoda tersembunyi menunggumu...", sub, 'bg-fuchsia-600 border-fuchsia-400', endTurn, customHtml);
+            triggerTypewriterModal(trigger.title, trigger.text, trigger.sub, trigger.colorClass, () => {
+                gameState.isMoving = false;
+                diceDisplay.innerText = '🎲';
+            }, customHtml);
         }
 
         function triggerTypewriterModal(title, mainText, subText, headerClass, onCloseCallback, customHtml = "") {
             clearTimeout(typewriterTimeout);
-            playMoan(); // Efek suara desahan saat modal muncul
-            toggleHeartbeat(true); // Mulai detak jantung kencang
+            playMoan(); 
+            toggleHeartbeat(true); 
             
-            // Setup Reset
             modalHeader.className = `text-white text-[10px] md:text-xs px-5 py-1.5 rounded-full font-bold tracking-widest shadow-[0_0_15px_currentColor] mb-5 z-10 border ${headerClass}`;
             modalHeader.innerHTML = title;
-
-            // Tambahkan efek denyut ke background modal
             document.getElementById('modal-content').classList.add('bg-heartbeat');
             
             promptText.innerHTML = '';
@@ -661,20 +824,15 @@
             
             modal.classList.remove('hidden');
             modal.classList.add('flex');
-
-            // Memutar suara ting! untuk pop-up tantangan
             sfx.popup();
 
-            // Typewriter loop
             let i = 0;
-            const speed = 30; // speed of typing
+            const speed = 30; 
             promptText.classList.add('cursor-blink');
 
             function typeWriter() {
                 if (i < mainText.length) {
-                    // Check for BR tag simulation (we pass plain text in prompts, but just in case)
                     if(mainText.charAt(i) === '<') {
-                        // find end of tag (simplified)
                         const end = mainText.indexOf('>', i);
                         if(end !== -1) {
                             promptText.innerHTML += mainText.substring(i, end + 1);
@@ -689,20 +847,15 @@
                     }
                     typewriterTimeout = setTimeout(typeWriter, speed);
                 } else {
-                    // Typing finished
                     promptText.classList.remove('cursor-blink');
-                    
                     if (subText) {
                         promptSubtext.innerHTML = subText;
                         promptSubtext.style.opacity = '1';
                     }
-
                     if (customHtml) {
                         modalCustomHtml.classList.remove('hidden');
                         modalCustomHtml.classList.add('animate-[popIn_0.5s_ease_forwards]');
                     }
-                    
-                    // Show button
                     setTimeout(() => {
                         btnCloseModal.style.opacity = '1';
                         btnCloseModal.style.pointerEvents = 'auto';
@@ -713,12 +866,11 @@
 
             typeWriter();
 
-            // Bind click
             btnCloseModal.onclick = () => {
                 modal.classList.add('hidden');
                 modal.classList.remove('flex');
                 document.getElementById('modal-content').classList.remove('bg-heartbeat');
-                toggleHeartbeat(false); // Matikan detak jantung
+                toggleHeartbeat(false);
                 if (onCloseCallback) onCloseCallback();
             };
         }
@@ -737,13 +889,6 @@
             }
         };
 
-        function endTurn() {
-            gameState.turn = gameState.turn === 1 ? 2 : 1;
-            gameState.isMoving = false;
-            updateTurnUI();
-            diceDisplay.innerText = '🎲';
-        }
-
         window.handlePhotoUpload = function(event) {
             const files = event.target.files;
             if (files && files.length > 0) {
@@ -751,19 +896,15 @@
                 for (let i = 0; i < files.length; i++) {
                     gameState.uploadedPhotos.push(URL.createObjectURL(files[i]));
                 }
-                
-                // Update badge indikator jumlah foto
                 const countBadge = document.getElementById('photo-count');
                 if (countBadge) {
                     countBadge.innerText = files.length;
                     countBadge.classList.remove('hidden');
                 }
-
-                triggerTypewriterModal('SISTEM AMAN', `✅ ${files.length} Foto memancing gairah berhasil dimuat secara lokal. Gambar akan muncul secara acak setiap ada arahan Truth/Dare! 100% Aman.`, '', 'bg-emerald-600 border-emerald-400', null);
+                triggerTypewriterModal('SISTEM AMAN', `✅ ${files.length} Foto berhasil dimuat lokal. Gambar akan menjadi "bumbu penyedap" saat pop-up tantangan muncul!`, '', 'bg-emerald-600 border-emerald-400', () => { gameState.isMoving = false; });
             }
         };
 
-        // Background Particles
         const particlesContainer = document.getElementById('particles');
         for (let i = 0; i < 30; i++) {
             const particle = document.createElement('div');
@@ -796,6 +937,10 @@
                 updateTokenPosition('p1', gameState.p1.pos);
                 updateTokenPosition('p2', gameState.p2.pos);
             });
+            
+            // Audio unlock fallbacks
+            document.body.addEventListener('click', window.unlockAudio, { once: true });
+            document.body.addEventListener('touchstart', window.unlockAudio, { once: true });
         };
     </script>
 </body>
