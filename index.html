@@ -9,6 +9,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <title>Sensual Path - 100 Tiles Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;1,600&family=Poppins:wght@300;400;600;700&display=swap');
@@ -149,6 +150,18 @@
             transform: scale(1.1);
         }
 
+        /* Detak Jantung Visual (Arousal Pulse) */
+        .bg-heartbeat {
+            animation: heartThrob 1.2s infinite;
+        }
+        @keyframes heartThrob {
+            0% { background-color: rgba(15, 23, 42, 0.9); }
+            15% { background-color: rgba(60, 10, 20, 0.95); box-shadow: inset 0 0 50px rgba(225,29,72,0.2); }
+            30% { background-color: rgba(15, 23, 42, 0.9); }
+            45% { background-color: rgba(80, 10, 25, 0.95); box-shadow: inset 0 0 100px rgba(225,29,72,0.4); }
+            100% { background-color: rgba(15, 23, 42, 0.9); }
+        }
+
         /* Custom Scrollbar untuk tampilan HP ukuran kecil */
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -201,7 +214,7 @@
             <div id="dice-display" class="w-14 h-14 bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl border border-slate-600 flex items-center justify-center text-2xl font-bold text-white shadow-[0_0_10px_rgba(255,255,255,0.1)] flex-shrink-0">
                 🎲
             </div>
-            <button id="btn-roll" onclick="rollDice()" class="flex-1 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-bold py-3 md:py-4 px-4 rounded-xl shadow-[0_0_20px_rgba(225,29,72,0.5)] transition-all active:scale-95 flex justify-center items-center gap-2 text-sm md:text-base border border-rose-400/50 pulse-danger">
+            <button id="btn-roll" onclick="window.rollDice()" class="flex-1 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-bold py-3 md:py-4 px-4 rounded-xl shadow-[0_0_20px_rgba(225,29,72,0.5)] transition-all active:scale-95 flex justify-center items-center gap-2 text-sm md:text-base border border-rose-400/50 pulse-danger">
                 LEMPAR DADU
             </button>
         </div>
@@ -232,6 +245,9 @@
     </div>
 
     <script>
+        //        // --- AUDIO SYNTH SETUP (TONE.JS) ---
+        let footstepSynth, breathSynth, breathFilter, heartbeatSynth, heartbeatLoop;
+        
         // 10x10 Board Generation Logic (1 to 100 Serpentine)
         const pathVisualMap = [];
         for (let row = 9; row >= 0; row--) {
@@ -255,43 +271,155 @@
             p1: { pos: 1, color: '#3b82f6', name: 'Suami' },
             p2: { pos: 1, color: '#ec4899', name: 'Istri' },
             isMoving: false,
-            uploadedPhotos: []
+            uploadedPhotos: [],
+            audioInited: false
+        };
+
+        async function initAudio() {
+            if (gameState.audioInited) return;
+            await Tone.start();
+            
+            // Synth Suara Langkah
+            footstepSynth = new Tone.NoiseSynth({
+                noise: { type: 'brown' },
+                envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 }
+            }).toDestination();
+            footstepSynth.volume.value = -15;
+
+            // Synth Desahan / Tarikan Napas Berat
+            breathFilter = new Tone.Filter(1500, "lowpass").toDestination();
+            breathSynth = new Tone.NoiseSynth({
+                noise: { type: 'pink' },
+                envelope: { attack: 0.5, decay: 1.5, sustain: 0.2, release: 2 }
+            }).connect(breathFilter);
+            breathSynth.volume.value = -2;
+
+            // Synth Detak Jantung
+            heartbeatSynth = new Tone.MembraneSynth({
+                pitchDecay: 0.05,
+                octave: 1,
+                oscillator: { type: "sine" },
+                envelope: { attack: 0.01, decay: 0.4, sustain: 0.01, release: 1.4 }
+            }).toDestination();
+            heartbeatSynth.volume.value = 0;
+            
+            Tone.Transport.start();
+            gameState.audioInited = true;
+        }
+
+        function playFootstep() {
+            if(gameState.audioInited && footstepSynth) footstepSynth.triggerAttackRelease("16n");
+        }
+
+        function playMoan() {
+            if(gameState.audioInited && breathSynth && breathFilter) {
+                breathFilter.frequency.rampTo(4000, 0.5);
+                breathSynth.triggerAttackRelease("2n");
+                setTimeout(() => breathFilter.frequency.rampTo(800, 1.5), 500);
+            }
+        }
+
+        function toggleHeartbeat(play) {
+            if (!gameState.audioInited) return;
+            if (play) {
+                if (heartbeatLoop) heartbeatLoop.dispose();
+                heartbeatLoop = new Tone.Loop(time => {
+                    heartbeatSynth.triggerAttackRelease("C1", "8n", time);
+                    heartbeatSynth.triggerAttackRelease("C1", "8n", time + 0.35);
+                }, "1n").start(0);
+            } else {
+                if (heartbeatLoop) heartbeatLoop.stop();
+            }
+        }
+
+        // Sound Effects (Tone.js) Setup for UI sounds
+        const sfx = {
+            init: false,
+            synth: null,
+            noise: null,
+            setup: async function() {
+                if (this.init) return;
+                this.synth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: "triangle" }
+                }).toDestination();
+                this.noise = new Tone.NoiseSynth({
+                    noise: { type: "white" },
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0 }
+                }).toDestination();
+                this.synth.volume.value = -8; // Volume melodi
+                this.noise.volume.value = -12; // Volume dadu
+                this.init = true;
+            },
+            rollDice: async function() {
+                if (!this.init) await this.setup();
+                if (!this.noise) return;
+                const now = Tone.now();
+                // Mensimulasikan suara dadu yang dikocok
+                this.noise.triggerAttackRelease("32n", now);
+                this.noise.triggerAttackRelease("32n", now + 0.1);
+                this.noise.triggerAttackRelease("32n", now + 0.25);
+                this.noise.triggerAttackRelease("32n", now + 0.35);
+                this.noise.triggerAttackRelease("32n", now + 0.5);
+            },
+            popup: async function() {
+                if (!this.init) await this.setup();
+                if (!this.synth) return;
+                // Suara "cling" saat pertanyaan muncul
+                this.synth.triggerAttackRelease("C5", "8n", Tone.now());
+                this.synth.triggerAttackRelease("E5", "8n", Tone.now() + 0.1);
+            },
+            snake: async function() {
+                if (!this.init) await this.setup();
+                if (!this.synth) return;
+                // Suara merosot turun (ular)
+                this.synth.triggerAttackRelease("G4", "8n", Tone.now());
+                this.synth.triggerAttackRelease("Eb4", "8n", Tone.now() + 0.2);
+                this.synth.triggerAttackRelease("C4", "4n", Tone.now() + 0.4);
+            },
+            ladder: async function() {
+                if (!this.init) await this.setup();
+                if (!this.synth) return;
+                // Suara naik tangga (gairah naik)
+                this.synth.triggerAttackRelease("C4", "8n", Tone.now());
+                this.synth.triggerAttackRelease("G4", "8n", Tone.now() + 0.15);
+                this.synth.triggerAttackRelease("C5", "4n", Tone.now() + 0.3);
+            }
         };
 
         const prompts = {
             truth: [
-                "Bagian tubuh mana dariku yang paling bikin kamu basah/keras saat ini juga?",
-                "Ceritakan secara detail bagaimana caramu menyentuh dirimu sendiri semalam sambil memikirkan aku.",
-                "Jika aku ada di sebelahmu sekarang, apa hal pertama yang akan kamu lakukan padaku di ranjang?",
-                "Posisi seks apa yang selalu ada di fantasimu yang paling liar tapi belum sempat kita coba?",
-                "Kapan terakhir kali kamu diam-diam masturbasi saat sedang chatting atau video call denganku?",
-                "Deskripsikan pakaian/lingerie paling menggoda yang akan kamu pakai khusus malam pertama kita bertemu lagi.",
-                "Sebutkan fantasi paling 'kotor' yang kamu ingin aku lakukan secara paksa padamu.",
-                "Pernahkah kamu membayangkan kita bercinta di tempat umum? Di mana itu?",
-                "Apa kalimat kotor (dirty talk) dariku yang paling bikin kamu cepat klimaks?",
-                "Gaya sentuhan seperti apa yang langsung membuatmu merinding kegirangan?"
+                "Tatap mataku di kamera. Deskripsikan secara brutal dan vulgar, apa yang akan kamu lakukan pada alat vitalku/tubuhku jika kita satu ranjang malam ini?",
+                "Kapan terakhir kali kamu menyentuh dirimu sendiri sambil membayangkan aku? Ceritakan posisinya dan seberapa basah/keras kamu saat itu.",
+                "Sebutkan 3 kalimat 'dirty talk' (kata kotor) yang paling ingin kamu dengar dari mulutku saat aku sedang berada di dalammu/menidurimu.",
+                "Posisi seks apa yang paling membuatmu cepat mencapai orgasme/klimaks? Jelaskan secara visual kepadaku sekarang.",
+                "Apa fantasi terliarmu (BDSM/roleplay/dominasi/pemaksaan konsensual) yang diam-diam sering kamu bayangkan tapi malu kamu utarakan?",
+                "Bagian tubuh mana dari diriku yang jika disentuh atau dicium akan langsung mematikan akal sehatmu?",
+                "Jika aku mengikat kedua tanganmu ke kepala ranjang sekarang, apa hal pertama yang kamu harap aku lakukan pada tubuh telanjangmu?",
+                "Ceritakan pengalaman masturbasi paling berani/nakal yang pernah kamu lakukan. Di mana dan sedang membayangkan apa?",
+                "Gaya sentuhan seperti apa di area paling sensitifmu yang selalu sukses membuat seluruh tubuhmu merinding kegirangan?",
+                "Tatap mataku dan jujurlah, apakah saat ini kamu sedang tidak memakai celana dalam? Jika pakai, warna apa dan seberapa tipis?"
             ],
             dare: [
-                "Posisikan kamera dengan baik, lalu sentuh dan elus bagian paling sensitifmu perlahan selama 30 detik tanpa putus kontak mata.",
-                "Lepas pakaian dalammu (panty/celana dalam) di depan kamera sekarang, dan biarkan kamu tidak memakainya sampai game ini selesai.",
-                "Desahkan namaku dengan suara paling liar yang kamu punya, bayangkan tanganku sedang bermain di bawah sana.",
-                "Jilat dan hisap jarimu perlahan dengan erotis, tatap kamera seolah-olah itu adalah milikku.",
-                "Buka kancing/pakaian atasmu sedikit demi sedikit, perlihatkan belahan dada/asetmu, lalu gigit bibir bawahmu 5 detik.",
-                "Tarik napas panjang, lalu berikan aku 'dirty talk' paling kotor dan berani yang bisa kamu pikirkan sekarang.",
-                "Mundur dari kamera, lalu buat gerakan memompa atau mengayunkan pinggul dengan erotis selama 15 detik.",
-                "Raba dan pijat pelan bagian dadamu sendiri di depan kamera sambil memejamkan mata.",
-                "Beri ciuman paling basah dan sensual ke layar HP, bayangkan bibir dan lidahku membalasnya.",
-                "Letakkan tanganmu di balik celana/baju, dan buat ekspresi wajah seolah kamu sedang mencapai orgasme."
+                "Arahkan kamera menyorot *close-up* langsung ke area selangkanganmu. Basahi jarimu dengan ludah, lalu mainkan area sensitifmu selama 60 detik sambil menatapku. Dilarang klimaks (Edging)!",
+                "Lepaskan seluruh pakaian dalammu sekarang juga di depan kamera, buang ke lantai, dan lanjutkan permainan ini tanpa memakainya sampai selesai.",
+                "Merangkaklah atau menungging membelakangi kamera. Tunjukkan lekuk pantatmu, lalu tepuk (spank) pantatmu sendiri dengan keras 3 kali sambil mendesahkan namaku.",
+                "Basahi bibirmu. Masukkan satu/dua jarimu ke dalam mulut, hisap perlahan dan dalam seperti sedang menghisap milikku sambil menatap layar dengan tatapan sayu.",
+                "Raba dan remas perlahan bagian dadamu. Buka sedikit pakaianmu untuk memamerkannya, gigit bibir bawahmu, lalu berikan aku desahan paling liar selama 10 detik tanpa henti.",
+                "Jika ada mainan (vibrator/dildo), gunakan sekarang di depan kamera. Jika tidak, gunakan dua jarimu, masukkan perlahan dan tunjukkan seberapa terangsangnya wajahmu padaku.",
+                "Matikan lampu kamarmu, nyalakan *flash* kamera HP. Sorot pelan dari leher, turun ke dada, perut, hingga menyorot terang area inti sensitifmu. Biarkan aku menikmatinya selama 30 detik.",
+                "Berikan aku *teasing* (godaan visual). Gesekkan jarimu di luar celana/pakaianmu tepat di area paling sensitif, buat dirimu kegerahan, tapi kamu dilarang menyentuh kulit aslinya selama 1 giliran ke depan.",
+                "Tutup matamu rapat-rapat. Raba seluruh lekuk tubuh telanjangmu dari atas ke bawah, mendesahlah pelan dan ceritakan apa yang kamu rasakan seolah-olah itu adalah tanganku.",
+                "Tatap mataku tajam di layar, desahkan kalimat kotor ini dengan sensual: 'Sayang, aku sangat basah/keras untukmu sekarang, tolong puaskan aku...'"
             ],
             ladderMsg: [
-                "G-Spot Tersentuh! Gairah memuncak drastis. Lompat ke kotak ",
-                "Sesi Foreplay Super Panas! Terangsang naik ke kotak ",
-                "Posisi 69 Sukses! Mendesah nikmat ke kotak "
+                "G-Spot Tersentuh Tepat Sasaran! Gairah meledak hebat. Lompat ke kotak ",
+                "Foreplay Panas Tak Tertahankan! Tubuhmu memanas, naik ke kotak ",
+                "Posisi 69 Super Basah! Mendesah nikmat menembus ke kotak "
             ],
             snakeMsg: [
-                "Terlalu Cepat Klimaks! Hukuman turun ke kotak ",
-                "Godaan Berbahaya. Kamu kehilangan kendali. Merosot ke kotak ",
-                "Loyo di Tengah Permainan! Kecewa dan mundur ke kotak "
+                "Terlalu Cepat Klimaks (Ejakulasi Dini)! Lemas dan dihukum merosot ke kotak ",
+                "Godaan Berbahaya! Kamu kehilangan kendali orgasme. Jatuh ke kotak ",
+                "Loyo di Tengah Permainan! Kecewa dan dipaksa mundur ke kotak "
             ]
         };
 
@@ -380,9 +508,17 @@
             }
         }
 
-        function rollDice() {
+        window.rollDice = async function() {
             if (gameState.isMoving) return;
+            
+            // Initialize Audio safely on first user interaction
+            if (!gameState.audioInited) {
+                await initAudio();
+                await sfx.setup();
+            }
+
             gameState.isMoving = true;
+            sfx.rollDice();
             
             const roll = Math.floor(Math.random() * 6) + 1;
             
@@ -394,7 +530,7 @@
                 diceDisplay.innerText = roll;
                 movePlayer(roll);
             }, 500);
-        }
+        };
 
         function movePlayer(roll) {
             const playerKey = gameState.turn === 1 ? 'p1' : 'p2';
@@ -408,6 +544,7 @@
                     step++;
                     gameState[playerKey].pos = step;
                     updateTokenPosition(playerKey, step);
+                    playFootstep(); // Putar suara langkah kaki
                 } else {
                     clearInterval(stepInterval);
                     checkTileEffects(playerKey, targetPos);
@@ -426,6 +563,7 @@
             }
 
             if (ladders[pos]) {
+                sfx.ladder();
                 const newPos = ladders[pos];
                 const msg = prompts.ladderMsg[Math.floor(Math.random() * prompts.ladderMsg.length)] + newPos;
                 triggerTypewriterModal('TANGGA GAIRAH 🪜', msg, '', 'bg-emerald-600 border-emerald-400', () => {
@@ -434,6 +572,7 @@
                     setTimeout(() => triggerRandomAction(playerName), 600);
                 });
             } else if (snakes[pos]) {
+                sfx.snake();
                 const newPos = snakes[pos];
                 const msg = prompts.snakeMsg[Math.floor(Math.random() * prompts.snakeMsg.length)] + newPos;
                 triggerTypewriterModal('ULAR GODAAN 🐍', msg, '', 'bg-rose-700 border-rose-500', () => {
@@ -499,10 +638,15 @@
 
         function triggerTypewriterModal(title, mainText, subText, headerClass, onCloseCallback, customHtml = "") {
             clearTimeout(typewriterTimeout);
+            playMoan(); // Efek suara desahan saat modal muncul
+            toggleHeartbeat(true); // Mulai detak jantung kencang
             
             // Setup Reset
             modalHeader.className = `text-white text-[10px] md:text-xs px-5 py-1.5 rounded-full font-bold tracking-widest shadow-[0_0_15px_currentColor] mb-5 z-10 border ${headerClass}`;
             modalHeader.innerHTML = title;
+
+            // Tambahkan efek denyut ke background modal
+            document.getElementById('modal-content').classList.add('bg-heartbeat');
             
             promptText.innerHTML = '';
             promptSubtext.innerHTML = '';
@@ -517,6 +661,9 @@
             
             modal.classList.remove('hidden');
             modal.classList.add('flex');
+
+            // Memutar suara ting! untuk pop-up tantangan
+            sfx.popup();
 
             // Typewriter loop
             let i = 0;
@@ -570,6 +717,8 @@
             btnCloseModal.onclick = () => {
                 modal.classList.add('hidden');
                 modal.classList.remove('flex');
+                document.getElementById('modal-content').classList.remove('bg-heartbeat');
+                toggleHeartbeat(false); // Matikan detak jantung
                 if (onCloseCallback) onCloseCallback();
             };
         }
